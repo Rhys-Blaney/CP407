@@ -1,0 +1,100 @@
+close 
+clear all 
+
+j = 20000; %current density (A/m2)
+Ac = 0.15; %electrode area (m2)
+I = j*Ac; %current (A)
+nc = 0.99; %faradaic efficiency (unitless)
+F = 96485; %faraday constant (A s/mol)
+Eth = 1.48;
+Ecell = 2.1; %voltage for 1 cell (V)
+Pcell = Ecell*I;  %power input for 1 cell (W)
+Pstack = 1e6; %Max power a stack can be (MW)
+N_theoretical  = Pstack/Pcell; %the amount of cells that can be in a stack based on max power of stack 
+N = 155; %rounded down from theoretical to help account for errors  
+
+mW_H2 = 2; %kg/kmol
+mW_H20 = 18; %kg/kmol
+mW_O2 = 32; %Kg/kmol
+
+Psat(80) = 0.5; %saturation pressure of water at 80C (bar)
+Pcathode = 30; %pressure at cathode (bar)
+Panode = 5; %pressure at anode (bar)
+
+%For 1 cell
+mol_H2_cathode_per_cell = ((I*nc)/(2*F))/1000; %hydrogen production rate for 1 cell (kmol/s)
+mass_H2_cathode_per_cell = mol_H2_cathode_per_cell*mW_H2; %mass hydrogen production rate for 1 cell (Kg/s)
+
+mol_O2_cathode_per_cell = ((I*(1-nc))/(4*F))/1000; %oxygen production rate for 1 cell (mol/s)
+mass_O2_cathode_per_cell = mol_O2_cathode_per_cell*mW_O2; %mass oxygen production rate for 1 cell (Kg/s)
+
+mol_H2_anode_per_cell = (I*(1-nc)/(2*F))/1000; %hydrogen production rate for 1 cell (mol/s)
+mass_H2_anode_per_cell = mol_H2_anode_per_cell*mW_H2; %mass hydrogen production rate for 1 cell (Kg/s)
+
+mol_O2_anode_per_cell = ((I*nc)/(4*F))/1000; %oxygen production rate for 1 cell (mol/s)
+mass_O2_anode_per_cell = mol_O2_anode_per_cell*mW_O2; %mass oxygen production rate for 1 cell (Kg/s)
+
+mol_H2O_vapour_cathode_per_cell = Psat/(Pcathode-Psat)*(mol_H2_cathode_per_cell+mol_O2_cathode_per_cell); %kmol/s
+mass_H2O_vapour_cathode_per_cell = mol_H2O_vapour_cathode_per_cell*mW_H20; %kg/s
+
+mol_H2O_vapour_anode_per_cell = Psat/(Panode-Psat)*(mol_H2_anode_per_cell+mol_O2_anode_per_cell); %kmol/s
+mass_H2O_vapour_anode_per_cell = mol_H2O_vapour_anode_per_cell*mW_H20; %kg/s
+
+mol_H2O_required = mol_H2_cathode_per_cell; %1:1 molar ratio (kmol/hr)
+mass_H2O_required = mol_H2O_required*mW_H20; %kg/hr 
+H2O_conversion = 0.8; %conversion rate of water into oxygen and hydrogen 
+excess_H2O_rate_required = 1-H2O_conversion; %excess water required 
+excess_mass_H2O_required_per_cell = mass_H2O_required+(mass_H2O_required*excess_H2O_rate_required); %Kg/s
+
+%For 1 stack 
+mass_H2_cathode_per_stack = mass_H2_cathode_per_cell*N*3600; %mass hydrogen production rate for 1 stack at cathode (Kg/hr)
+mass_H2_anode_per_stack = mass_H2_anode_per_cell*N*3600; %mass hydrogen production rate for 1 stack anode(Kg/hr)
+
+mass_O2_cathode_per_stack = mass_O2_cathode_per_cell*N*3600; %mass oxygen production rate for 1 stack at cathode (Kg/hr)
+mass_O2_anode_per_stack = mass_O2_anode_per_cell*N*3600; %mass oxygen production rate for 1 stack anode(Kg/hr)
+
+mass_H2O_vapour_cathode_per_stack = mass_H2O_vapour_cathode_per_cell*N*3600; %mass water vapouur production rate for 1 stack at cathode (Kg/hr)
+mass_H2O_vapour_anode_per_stack = mass_H2O_vapour_anode_per_cell*N*3600; %mass water vapouur production rate for 1 stack at cathode (Kg/hr)
+mass_H2O_inlet_required_per_stack = excess_mass_H2O_required_per_cell*N*3600; %mass of water entering the 1 MW stack (Kg/hr)
+
+%HydrogenTarget 
+
+Target_hydrogen_prodction = 300; %total hydrogen production rate for electrolyser (kg/hr)
+number_of_stacks_theoretical = Target_hydrogen_prodction/mass_H2_cathode_per_stack;
+number_of_stacks = 18; %rounded up to help account for errors
+
+Total_power_requirement = number_of_stacks*Pstack/1e6; %power requirement of electrolyser (MW)
+
+%Final streams
+
+mass_H2O_inlet_required_electrolyser=mass_H2O_inlet_required_per_stack*number_of_stacks %(kg/hr)
+
+mass_H2_cathode_electrolyser = mass_H2_cathode_per_stack*number_of_stacks %(kg/hr)
+mass_O2_cathode_electrolyser = mass_O2_cathode_per_stack*number_of_stacks %(kg/hr)
+mass_H20_vapour_cathode_electrolyser = mass_H2O_vapour_cathode_per_stack*number_of_stacks %(kg/hr)
+
+mass_H2_anode_electrolyser = mass_H2_anode_per_stack*number_of_stacks %(kg/hr)
+mass_O2_anode_electrolyser = mass_O2_anode_per_stack*number_of_stacks %(kg/hr)
+mass_H20_vapour_anode_electrolyser = mass_H2O_vapour_anode_per_stack*number_of_stacks %(kg/hr)
+mass_H20_liquid_anode_electrolyser = 0.2*mass_H2O_inlet_required_electrolyser %the amount of unreacted water that is recyled back (kg/hr)
+
+mass_H2O_liquid_required_with_recylce=mass_H2O_inlet_required_electrolyser-mass_H20_liquid_anode_electrolyser %water required from previous node to mix with recylced water (kg/hr)
+
+%heat generated309
+
+heat_generated_per_cell = I*(Ecell-Eth)
+heat_generated_per_stack = heat_generated_per_cell*N
+heat_generated_electrolyser = heat_generated_per_stack*number_of_stacks*1e-6
+
+% 90 percent capacity 
+
+mass_H2_cathode_electrolyser_90 = mass_H2_cathode_electrolyser*0.9 %(kg/hr)
+mass_O2_cathode_electrolyser_90 = mass_O2_cathode_electrolyser*0.9 %(kg/hr)
+mass_H20_vapour_cathode_electrolyser_90 = mass_H20_vapour_cathode_electrolyser*0.9 %(kg/hr)
+
+mass_H2_anode_electrolyser_90 = mass_H2_anode_electrolyser*0.9 %(kg/hr)
+mass_O2_anode_electrolyser_90 = mass_O2_anode_electrolyser*0.9 %(kg/hr)
+mass_H20_vapour_anode_electrolyser_90 = mass_H20_vapour_anode_electrolyser*0.9 %(kg/hr)
+mass_H20_liquid_anode_electrolyser_90 = mass_H20_liquid_anode_electrolyser*0.9 %the amount of unreacted water that is recyled back (kg/hr)
+
+mass_H2O_liquid_required_with_recylce_90=mass_H2O_liquid_required_with_recylce*0.9 %water required from previous node to mix with recylced water (kg/hr)
