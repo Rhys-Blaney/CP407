@@ -1,0 +1,70 @@
+clear 
+close all
+
+
+R = 8.3145; %universal gas constant (J/mol K)
+F = 96486; %Faraday's constant (A s/mol)
+n = 2; %number of transferred electrons (unitless)
+
+As = 1500; %electrode surface area (cm2)
+i = [0:0.01:3]; %current density (A/cm2)
+i_tr = i.';
+I = i_tr.*As; %current (A)
+
+T = [293:10:353]; %temperature range (K)
+
+%open-circuit voltage
+
+Erev = 1.5184-(1.5421e-3).*T+(9.523e-5).*T.*log(T)+(9.84e-8).*T.^2;
+
+P0 = 1; % (bar)
+P_anode = 5; %pressure at anode (bar)
+P_cathode = 30; %pressure at cathode (bar)
+aH2 = P_cathode/P0; %activity of hydrogen (unitless)
+aO2 = P_anode/P0; %activity of oxygen (unitless)
+
+other_bit = ((R.*T)/(n*F))*log(aH2*aO2^0.5);
+
+Eocv = Erev+other_bit; %open-circuit voltage (V) at different temperatures 
+Eocv_transpose = Eocv.'; 
+
+%ohmic resistance 
+membrane_thickness = 183e-6; %membrane thickness (m)
+conductivty = 15; %ionic conductivity of N117 (S/m)
+
+Eohm = (membrane_thickness.*I)/conductivty;
+
+%activation resistance
+
+T_ref = 353; 
+i0_ref_anode = 1e-7; %exchange current denisty at Tref (A/cm2)
+i0_ref_cathode = 1e-3; %exchange current denisty at Tref (A/cm2)
+E_act_anode = 90000; %activation energy at anode at Tref (J/mol)
+E_act_cathode = 30000; %activation energy at cathode at Tref (J/mol)
+
+i0_anode = i0_ref_anode*exp((E_act_anode/R)*((1/T_ref)-(1./T))); %exchange current density for anode
+i0_cathode = i0_ref_cathode*exp((E_act_cathode/R)*((1/T_ref)-(1./T))); %exchange current density for cathode 
+
+a_a = 0.5; %transfer coefficients (unitless)
+a_c = 0.5; %transfer coefficients (unitless)
+
+E_act_anode = (R.*T)/(a_a*n*F).*log(i_tr./i0_anode);
+E_act_cathode = (R.*T)/(a_c*n*F).*log(i_tr./i0_cathode);
+
+%Cell Voltage
+
+Ecell = Eocv+Eohm+E_act_cathode+E_act_anode;
+
+%Graph 
+plot(i,Ecell(:,1))
+hold on
+plot(i,Ecell(:,2))
+plot(i,Ecell(:,3))
+plot(i,Ecell(:,4))
+plot(i,Ecell(:,5))
+plot(i,Ecell(:,6))
+plot(i,Ecell(:,7))
+legend('293 K','303 K','313 K','323 K','333 K','343 K','353 K','Position',[0.71488,0.22222,0.14821,0.26667])
+xlabel('Current Density (A/cm^{2})')
+ylabel('Cell Voltage (V)')
+grid on
